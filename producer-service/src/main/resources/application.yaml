@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: producer-service
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        "[enable.idempotence]": true
+        "[max.block.ms]": 5000
+        "[delivery.timeout.ms]": 10000
+        "[request.timeout.ms]": 5000
+        "[spring.json.add.type.headers]": false
+
+server:
+  port: 8081
+
+spring.mvc.async.request-timeout: 20s

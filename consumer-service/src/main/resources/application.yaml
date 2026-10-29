@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: consumer-service
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    consumer:
+      group-id: order-notification-v2-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        "[spring.deserializer.value.delegate.class]": org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        "[spring.json.value.default.type]": com.henry.consumer.event.OrderCreatedEvent
+        "[spring.json.trusted.packages]": com.henry.consumer.event
+        "[spring.json.use.type.headers]": false
+    listener:
+      ack-mode: record
+
+server:
+  port: 8082
