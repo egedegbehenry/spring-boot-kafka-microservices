@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: streams-service
+
+  main:
+    web-application-type: none
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+    streams:
+      application-id: order-processing-streams
+      properties:
+        "[auto.offset.reset]": earliest
+
+        # Application-specific configuration.
+        app:
+          schema-registry:
+            # Schema Registry runs through our Docker proxy on port 8085.
+            url: http://localhost:8085

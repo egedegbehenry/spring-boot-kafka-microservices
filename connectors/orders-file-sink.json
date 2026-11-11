@@ -1,0 +1,9 @@
+{
+  "name": "orders-file-sink",
+  "config": {
+    "connector.class": "org.apache.kafka.connect.file.FileStreamSinkConnector",
+    "tasks.max": "1",
+    "topics": "orders.processed.v1",
+    "file": "/data/orders-processed.jsonl"
+  }
+}

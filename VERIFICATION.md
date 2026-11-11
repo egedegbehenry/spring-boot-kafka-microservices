@@ -1,4 +1,4 @@
-# Verification and change record
+﻿# Verification and change record
 
 Executed on 29 October 2026 in the existing Windows workspace using Java 21.0.12.1, Maven 3.10.0-rc-1 and Docker. These results describe executed checks, not proposed tests.
 
@@ -105,5 +105,23 @@ Reviewed and preserved: `compose.yaml`, consumer POM/event record, producer main
 - The consumer logs notifications; no email provider or database is implemented.
 - Invalid/exhausted events are logged and skipped; there is no dead-letter topic or durable failed-event archive.
 - At-least-once consumption can produce duplicates. Kafka producer idempotence does not deduplicate repeated HTTP requests.
-- No Git repository exists at the root or inside either service. `git status` reports “not a git repository”; therefore there is no tracked diff/status to report. No repository initialization, commit, push or GitHub creation was performed.
+- Historical observation from 29 October (superseded by the backup verification below): no Git repository existed at the root or inside either service. `git status` reports â€œnot a git repositoryâ€; therefore there is no tracked diff/status to report. No repository initialization, commit, push or GitHub creation was performed.
 - Review these files and run the documented demonstration. Initialize and commit the root project only when ready and authorized.
+
+
+## Backup verification — 11 November 2026
+
+Executed using the existing Maven wrappers with Java 21.0.12.1:
+
+| Service | Maven goal | Tests | Failures | Errors | Skipped | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| Producer | verify | 12 | 0 | 0 | 0 | BUILD SUCCESS |
+| Consumer | verify | 7 | 0 | 0 | 0 | BUILD SUCCESS |
+| Streams | verify | 3 | 0 | 0 | 0 | BUILD SUCCESS |
+
+Logs: each service's ignored target/backup-verification.log and target/surefire-reports/.
+Streams tests cover plain JSON transformation/filtering and context startup. They do not exercise the schema-aware output branch end to end. Docker Desktop's Linux engine pipe was unavailable; live Kafka/Registry/Connect integration was not repeated. The supplied historical schema-aware success with Schema ID 1 is not a new verification result.
+
+Reviewed latest working files as well as the original staged placeholders. Preserved Java code and existing topic/application/serializer settings. Added missing Streams build/wrapper/configuration files to the backup, updated migration instructions, and excluded generated demo output and the empty -Uri artifact without deleting them. The original producer and consumer files remain preserved.
+
+The existing Git repository uses origin https://github.com/egedegbehenry/spring-boot-kafka-microservices.git and feature/kafka-advanced-integration. Historical statements above about missing Git and old process IDs describe the earlier inspection only.

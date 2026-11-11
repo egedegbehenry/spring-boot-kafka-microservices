@@ -1,6 +1,6 @@
-# Kafka Order Microservices
+﻿# Kafka Order Microservices
 
-Two independent Java services demonstrate a validated HTTP order request becoming a structured Kafka event and a consumer notification. Objectives include asynchronous publishing, independent service deployment, a JSON contract, keyed ordering, acknowledgments, consumer groups, validation, recovery, and automated testing.
+Three independent Java services demonstrate HTTP order publication, consumer notification, Kafka Streams processing, JSON Schema serialization and Kafka Connect file export. Objectives include asynchronous publishing, independent service deployment, a JSON contract, keyed ordering, acknowledgments, consumer groups, validation, recovery, and automated testing.
 
 ## Architecture
 
@@ -210,4 +210,112 @@ Surefire reports are written to each service's `target/surefire-reports`. Live e
 
 ## Git and excluded files
 
-Inspection found no Git repository at the root or inside either service. A root `.gitignore` excludes Maven outputs, IntelliJ/VS Code metadata, logs, environment files and common secret files. Existing service ignore files are preserved. No repository, commit, push, or GitHub project is created by this work. Review the source and documentation, then initialize/version the root only when ready and authorized.
+The existing repository is https://github.com/egedegbehenry/spring-boot-kafka-microservices.git. Completed advanced integration is on feature/kafka-advanced-integration. Root and service ignore files exclude build outputs, IDE state and secrets. Generated Connect output and the empty accidental PowerShell artifact -Uri remain local.
+
+
+## Advanced integration and migration to a new computer
+
+The original architecture diagram above shows the producer/consumer path. The completed extension adds:
+
+```text
+orders.created.v2 -> order-processing-streams
+  -> orders.processed.v1 (plain JSON) -> orders-file-sink -> connect-output/orders-processed.jsonl
+  -> orders.processed.schema.v1 (Confluent JSON Schema framing, Registry subject orders.processed.schema.v1-value)
+```
+
+The Streams filter requires a nonblank orderId and product, positive quantity and status CREATED. It preserves the key and maps to orderId, product, quantity and processingStatus PROCESSED. The consumer still receives the original created events. No topic names, application IDs, serializers or business rules have been changed for this backup.
+
+Additional versioned components: streams-service/ (POM, wrappers, .mvn, source, application.yaml and tests), schemas/processed-order.schema.json, connectors/orders-file-sink.json, and the Schema Registry/Connect services and localhost proxies in compose.yaml.
+
+### Install and clone
+
+Install a **JDK 21**, Git, and Docker Desktop with its Linux container engine and Docker Compose enabled. Set JAVA_HOME to the JDK and check java -version. Standalone Maven is optional: all three services include Maven wrappers, which download Maven and dependencies on first use (internet access required).
+
+Download IntelliJ IDEA from [JetBrains](https://www.jetbrains.com/idea/download/) and run its installer or install through JetBrains Toolbox; see the [official installation guide](https://www.jetbrains.com/help/idea/installation-guide.html). Open the cloned directory, select JDK 21 as the Project SDK, and link/import all three service pom.xml files as Maven projects. Recreate run configurations for their application main classes with the matching service as the module.
+
+Run in PowerShell from your chosen parent folder:
+
+```powershell
+git clone --branch feature/kafka-advanced-integration https://github.com/egedegbehenry/spring-boot-kafka-microservices.git
+Set-Location spring-boot-kafka-microservices
+New-Item -ItemType Directory -Force connect-output | Out-Null
+docker compose up -d
+docker compose ps
+```
+
+These startup instructions apply to a fresh clone. Keep existing old-computer containers/volumes intact. Services may need time to initialize; check docker compose logs schema-registry kafka-connect if endpoints are not ready. Shared Kafka networking and the two proxies expose Registry on localhost:8085 and Connect on localhost:8083. Kafka is localhost:9092. The bind mount ./connect-output:/data stores exported records on the host; .gitkeep preserves the directory in Git.
+
+### Restore topics and schema before starting Streams
+
+On a fresh broker, create the three application topics:
+
+```powershell
+foreach ($topic in @('orders.created.v2', 'orders.processed.v1', 'orders.processed.schema.v1')) {
+    docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic $topic --partitions 1 --replication-factor 1
+}
+Invoke-RestMethod -Uri 'http://localhost:8085/subjects'
+$schemaRegistration = @{
+    schemaType = 'JSON'
+    schema = Get-Content schemas/processed-order.schema.json -Raw
+} | ConvertTo-Json -Depth 20
+Invoke-RestMethod -Uri 'http://localhost:8085/subjects/orders.processed.schema.v1-value/versions' -Method Post -ContentType 'application/vnd.schemaregistry.v1+json' -Body $schemaRegistration
+Invoke-RestMethod -Uri 'http://localhost:8085/subjects/orders.processed.schema.v1-value/versions/latest'
+```
+
+The previous successful integration used Schema ID 1 (historical result supplied with the assignment). A new Registry may assign a different ID; do not hardcode 1. Streams uses the latest registered subject version with automatic registration disabled and schema validation enabled. Register before sending events. Existing application.yaml uses the localhost:8085 default in the Java @Value expression; its nested app block is under Streams properties. For a different Registry address, pass the top-level property --app.schema-registry.url=http://HOST:PORT explicitly.
+
+### Register the FileStream sink
+
+Wait until Connect responds, then register the reviewed configuration:
+
+```powershell
+Invoke-RestMethod -Uri 'http://localhost:8083/connector-plugins'
+Invoke-RestMethod -Uri 'http://localhost:8083/connectors' -Method Post -ContentType 'application/json' -Body (Get-Content connectors/orders-file-sink.json -Raw)
+Invoke-RestMethod -Uri 'http://localhost:8083/connectors/orders-file-sink/status'
+```
+
+Expect connector and task state RUNNING. If already registered (HTTP 409), inspect its existing configuration and status rather than deleting it. The configured plugin path includes /usr/share/filestream-connectors and the connector reads **orders.processed.v1** with StringConverter. The schema-aware topic deliberately has a different wire format.
+
+### Build, test and run all three services
+
+From the repository root:
+
+```powershell
+.\producer-service\mvnw.cmd -f producer-service/pom.xml verify
+.\consumer-service\mvnw.cmd -f consumer-service/pom.xml verify
+.\streams-service\mvnw.cmd -f streams-service/pom.xml verify
+```
+
+After successful builds, start each in a separate terminal (or run ProducerServiceApplication, ConsumerServiceApplication and StreamsServiceApplication in IntelliJ):
+
+```powershell
+java -jar producer-service/target/producer-service-0.0.1-SNAPSHOT.jar
+```
+
+```powershell
+java -jar consumer-service/target/consumer-service-0.0.1-SNAPSHOT.jar
+```
+
+```powershell
+java -jar streams-service/target/streams-service-0.0.1-SNAPSHOT.jar
+```
+
+Producer runs on 8081, consumer on 8082; Streams is non-web. Use Swagger at http://localhost:8081/swagger-ui/index.html and submit the demonstration request above with a new orderId. Expect HTTP 202, consumer notification logs, and processed output:
+
+```powershell
+docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic orders.processed.v1 --from-beginning --max-messages 1 --timeout-ms 15000
+Get-Content connect-output/orders-processed.jsonl -Tail 10
+docker compose exec schema-registry kafka-json-schema-console-consumer --bootstrap-server localhost:9092 --topic orders.processed.schema.v1 --from-beginning --max-messages 1 --timeout-ms 15000 --property schema.registry.url=http://localhost:8085
+```
+
+The last command decodes the Confluent framing using Registry (see [Confluent JSON Schema documentation](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/serdes-json.html)). An ordinary string console consumer cannot properly decode this topic. Reading from the beginning may show an older record; match the new orderId using a longer console read if needed. The demo output file is intentionally ignored and recreated by the sink as new processed orders arrive. Restarting an existing connector resumes its offsets; removing its output file does not itself replay old messages.
+
+### Separate backup before retiring the old computer
+
+Git preserves source, schemas, configuration, tests and documentation. It does **not** preserve running applications, Kafka messages/offsets, Registry contents, Connect runtime state or Docker volumes. The broker's current Compose configuration has no explicit named data volume; anonymous/container data needs a separate Docker-aware backup if historical events matter. Preserve the existing containers and volumes until that backup is checked. Do not use down -v, remove topics or reset offsets.
+
+The local connect-output/orders-processed.jsonl contains demo/test events and is reproducible by sending test orders. Copy it separately if exact historical records matter. The zero-byte -Uri file has no project content. Ignored service HELP.md files are generated Spring Initializr reference links. target/ contains reproducible builds, reports and demo logs; preserve any historical evidence separately if required.
+
+Export IntelliJ settings/run configurations securely if desired (.idea is excluded). Transfer any personal Maven settings/proxy credentials, Git SSH keys or credential-manager setup, Docker configuration and environment variables via a secure method, never this repository. No .env or private-key files were found in the project file inventory. Check personal files outside this project separately before retiring the machine.
+
+A pull request and merge to main are optional later; cloning the feature branch is sufficient to recover this completed project.

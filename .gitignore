@@ -14,3 +14,10 @@
 *.jks
 .DS_Store
 Thumbs.db
+
+# Local generated artifacts (preserve on disk, do not upload)
+/-Uri
+/connect-output/*
+!/connect-output/.gitkeep
+*.class
+hs_err_pid*

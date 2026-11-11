@@ -1,5 +1,61 @@
+
 services:
   kafka:
     image: apache/kafka:4.1.2
     ports:
       - "127.0.0.1:9092:9092"
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:8.1.6
+    network_mode: "service:kafka"
+    depends_on:
+      - kafka
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: localhost
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://localhost:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8085
+
+  schema-registry-proxy:
+    image: alpine/socat:1.8.0.3
+    ports:
+      - "127.0.0.1:8085:8085"
+    command:
+      - "TCP-LISTEN:8085,fork,reuseaddr"
+      - "TCP:kafka:8085"
+    depends_on:
+      - schema-registry
+
+
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:8.1.6
+    network_mode: "service:kafka"
+    depends_on:
+      - kafka
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: "localhost:9092"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "localhost"
+      CONNECT_REST_PORT: "8083"
+      CONNECT_GROUP_ID: "order-connect-demo"
+      CONNECT_CONFIG_STORAGE_TOPIC: "order-connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "order-connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "order-connect-status"
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_OFFSET_STORAGE_PARTITIONS: "1"
+      CONNECT_STATUS_STORAGE_PARTITIONS: "1"
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/filestream-connectors"
+    volumes:
+      - ./connect-output:/data
+
+  kafka-connect-proxy:
+    image: alpine/socat:1.8.0.3
+    ports:
+      - "127.0.0.1:8083:8083"
+    command:
+      - "TCP-LISTEN:8083,fork,reuseaddr"
+      - "TCP:kafka:8083"
+    depends_on:
+      - kafka-connect

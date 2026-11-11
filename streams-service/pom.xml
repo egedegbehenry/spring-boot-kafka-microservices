@@ -1,0 +1,97 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<!-- Spring Boot manages compatible dependency versions. -->
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.2</version>
+		<relativePath/>
+	</parent>
+
+	<!-- Identifies our Kafka Streams microservice. -->
+	<groupId>com.henry</groupId>
+	<artifactId>streams-service</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>streams-service</name>
+	<description>Kafka Streams order processing service</description>
+
+	<properties>
+		<!-- Use Java 21 for this application. -->
+		<java.version>21</java.version>
+	</properties>
+
+	<dependencies>
+
+		<!-- Spring Boot integration with Apache Kafka. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka</artifactId>
+		</dependency>
+
+		<!-- Provides Kafka Streams for processing Kafka events. -->
+		<dependency>
+			<groupId>org.apache.kafka</groupId>
+			<artifactId>kafka-streams</artifactId>
+		</dependency>
+
+		<!-- Provides Jackson JSON serialization support. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-jackson</artifactId>
+		</dependency>
+
+		<!-- Spring Kafka testing and JUnit support. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-kafka-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Test Kafka Streams topologies without a running broker. -->
+		<dependency>
+			<groupId>org.apache.kafka</groupId>
+			<artifactId>kafka-streams-test-utils</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!--
+            Enables JSON Schema-aware serialization for Kafka Streams.
+            Connects serialized events to Confluent Schema Registry.
+        -->
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-streams-json-schema-serde</artifactId>
+			<version>8.1.6</version>
+		</dependency>
+
+	</dependencies>
+
+	<!--
+        IMPORTANT: Repositories must be outside dependencies.
+        This repository hosts Confluent Schema Registry libraries.
+    -->
+	<repositories>
+		<repository>
+			<id>confluent</id>
+			<name>Confluent Maven Repository</name>
+			<url>https://packages.confluent.io/maven/</url>
+		</repository>
+	</repositories>
+
+	<!-- Maven plugin for packaging and running Spring Boot. -->
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
